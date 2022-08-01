@@ -24,8 +24,12 @@ type ErrorData = Omit<ErrorResult, 'success'>
 
 type Result<T = void> = SuccessResult<T> | ErrorResult
 
-type DomainFunction<Output = unknown> = {
-  (input: unknown, environment?: unknown): Promise<Result<Output>>
+type GenericRecord = Record<string | symbol | number, unknown>
+type DomainFunction<
+  Output = unknown,
+  Environment extends GenericRecord = GenericRecord,
+> = {
+  (input: unknown, environment?: Environment): Promise<Result<Output>>
 }
 
 type UnpackResult<F extends DomainFunction> = Awaited<ReturnType<F>>
@@ -37,6 +41,7 @@ type UnpackData<F extends DomainFunction> = UnpackSuccess<F>['data']
 
 export type {
   DomainFunction,
+  GenericRecord,
   Result,
   SchemaError,
   SuccessResult,

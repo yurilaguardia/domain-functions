@@ -9,6 +9,7 @@ import {
 import {
   DomainFunction,
   ErrorData,
+  GenericRecord,
   Result,
   SchemaError,
   SuccessResult,
@@ -16,16 +17,19 @@ import {
 
 type MakeDomainFunction = <
   Schema extends z.ZodTypeAny,
-  EnvSchema extends z.ZodTypeAny,
+  EnvSchema extends z.AnyZodObject,
 >(
   inputSchema: Schema,
   environmentSchema?: EnvSchema,
 ) => <Output>(
   handler: (
     inputSchema: z.infer<Schema>,
-    environmentSchema: z.infer<EnvSchema>,
+    environmentSchema?: z.infer<EnvSchema>,
   ) => Promise<Output>,
-) => DomainFunction<Output>
+) => DomainFunction<
+  Output,
+  EnvSchema extends undefined ? z.AnyZodObject : z.infer<EnvSchema>
+>
 
 const formatSchemaErrors = (errors: z.ZodIssue[]): SchemaError[] =>
   errors.map((error) => {
@@ -36,7 +40,7 @@ const formatSchemaErrors = (errors: z.ZodIssue[]): SchemaError[] =>
 const makeDomainFunction: MakeDomainFunction =
   (
     inputSchema: z.ZodTypeAny = z.object({}),
-    environmentSchema: z.ZodTypeAny = z.object({}),
+    environmentSchema: z.AnyZodObject = z.object({}),
   ) =>
   (handler) => {
     const domainFunction = (async (input, environment = {}) => {
@@ -143,7 +147,7 @@ type Flow = <T extends readonly DomainFunction[]>(...fns: T) => Last<T>
 const pipe: Flow = (...fns) => {
   const [head, ...tail] = fns
 
-  return ((input: unknown, environment?: unknown) => {
+  return ((input: unknown, environment?: GenericRecord) => {
     return tail.reduce(async (memo, fn) => {
       const resolved = await memo
       if (resolved.success) {
@@ -155,11 +159,10 @@ const pipe: Flow = (...fns) => {
   }) as Last<typeof fns>
 }
 
-type Map = <O, R>(
-  dfn: DomainFunction<O>,
+type Map = <O, R, E extends GenericRecord>(
+  dfn: DomainFunction<O, E>,
   mapper: (element: O) => R,
-) => DomainFunction<R>
-
+) => DomainFunction<R, E>
 const map: Map = (dfn, mapper) => {
   return async (input, environment) => {
     const result = await dfn(input, environment)
@@ -184,11 +187,11 @@ const map: Map = (dfn, mapper) => {
     }
   }
 }
-type MapError = <O>(
-  dfn: DomainFunction<O>,
-  mapper: (element: ErrorData) => ErrorData,
-) => DomainFunction<O>
 
+type MapError = <O, E extends GenericRecord>(
+  dfn: DomainFunction<O, E>,
+  mapper: (element: ErrorData) => ErrorData,
+) => DomainFunction<O, E>
 const mapError: MapError = (dfn, mapper) => {
   return async (input, environment) => {
     const result = await dfn(input, environment)

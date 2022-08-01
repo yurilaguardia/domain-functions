@@ -51,7 +51,7 @@ describe('makeDomainFunction', () => {
       envParser,
     )(async ({ id }, { uid }) => [id, uid])
 
-    expect(await handler({ id: '1' }, { uid: '2' })).toEqual({
+    expect(await handler({ id: '1' }, { uid: 2 })).toEqual({
       success: true,
       data: [1, 2],
       errors: [],
@@ -78,6 +78,7 @@ describe('makeDomainFunction', () => {
       envParser,
     )(async ({ id }, { uid }) => [id, uid])
 
+    // @ts-expect-error We are testing the runtime errors here
     expect(await handler({ id: '1' }, { uid: '2' })).toEqual({
       success: false,
       errors: [],
@@ -87,8 +88,8 @@ describe('makeDomainFunction', () => {
   })
 
   it('accepts literals as input of domain functions', async () => {
-    const foo = makeDomainFunction(z.number(), z.string())(async (n) => n + 1)
-    const result = await foo(1, 'not going to be used')
+    const foo = makeDomainFunction(z.number())(async (n) => n + 1)
+    const result = await foo(1)
     expect((result as SuccessResult<number>).data).toEqual(2)
   })
 
