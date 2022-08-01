@@ -1,3 +1,5 @@
+import { Merge } from 'type-fest'
+
 type ErrorWithMessage = {
   message: string
 }
@@ -36,6 +38,11 @@ type UnpackSuccess<F extends DomainFunction> = Extract<
 >
 type UnpackData<F extends DomainFunction> = UnpackSuccess<F>['data']
 
+type Merge2<T1, T2> = Merge<T1, T2>
+type Merge3<T1, T2, T3> = Merge<Merge<T1, T2>, T3>
+type Merge4<T1, T2, T3, T4> = Merge<Merge<Merge<T1, T2>, T3>, T4>
+type Merge5<T1, T2, T3, T4, T5> = Merge<Merge<Merge<Merge<T1, T2>, T3>, T4>, T5>
+
 export type {
   DomainFunction,
   GenericRecord,
@@ -48,4 +55,8 @@ export type {
   UnpackSuccess,
   UnpackData,
   ErrorWithMessage,
+  Merge2,
+  Merge3,
+  Merge4,
+  Merge5,
 }

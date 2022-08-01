@@ -1,6 +1,5 @@
 import * as z from 'zod'
-import { UnpackData } from './types'
-import { Merge } from 'type-fest'
+import { Merge2, Merge3, Merge4, Merge5, UnpackData } from './types'
 import {
   EnvironmentError,
   InputError,
@@ -17,8 +16,8 @@ import {
   SuccessResult,
 } from './types'
 
-const emptyObject = z.object({})
-type EmptyObject = z.infer<typeof emptyObject>
+// eslint-disable-next-line @typescript-eslint/ban-types
+type EmptyObject = {}
 type MakeDomainFunction = <
   InpSchema extends z.ZodTypeAny,
   EnvSchema extends z.AnyZodObject,
@@ -119,7 +118,7 @@ function all<T1 extends DomainFunction, T2 extends DomainFunction>(
   d2: T2,
 ): DomainFunction<
   [UnpackData<T1>, UnpackData<T2>],
-  Merge<UnpackEnv<T1>, UnpackEnv<T2>>
+  Merge2<UnpackEnv<T1>, UnpackEnv<T2>>
 >
 function all<
   T1 extends DomainFunction,
@@ -131,7 +130,7 @@ function all<
   d3: T3,
 ): DomainFunction<
   [UnpackData<T1>, UnpackData<T2>, UnpackData<T3>],
-  Merge<Merge<UnpackEnv<T1>, UnpackEnv<T2>>, UnpackEnv<T3>>
+  Merge3<UnpackEnv<T1>, UnpackEnv<T2>, UnpackEnv<T3>>
 >
 function all<
   T1 extends DomainFunction,
@@ -145,10 +144,7 @@ function all<
   d4: T4,
 ): DomainFunction<
   [UnpackData<T1>, UnpackData<T2>, UnpackData<T3>, UnpackData<T4>],
-  Merge<
-    Merge<Merge<UnpackEnv<T1>, UnpackEnv<T2>>, UnpackEnv<T3>>,
-    UnpackEnv<T4>
-  >
+  Merge4<UnpackEnv<T1>, UnpackEnv<T2>, UnpackEnv<T3>, UnpackEnv<T4>>
 >
 function all<
   T1 extends DomainFunction,
@@ -170,11 +166,11 @@ function all<
     UnpackData<T4>,
     UnpackData<T5>,
   ],
-  Merge<
-    Merge<
-      Merge<Merge<UnpackEnv<T1>, UnpackEnv<T2>>, UnpackEnv<T3>>,
-      UnpackEnv<T4>
-    >,
+  Merge5<
+    UnpackEnv<T1>,
+    UnpackEnv<T2>,
+    UnpackEnv<T3>,
+    UnpackEnv<T4>,
     UnpackEnv<T5>
   >
 >
@@ -212,7 +208,7 @@ function isListOfSuccess<T>(result: Result<T>[]): result is SuccessResult<T>[] {
 function pipe<T1 extends DomainFunction, T2 extends DomainFunction>(
   d1: T1,
   d2: T2,
-): DomainFunction<UnpackData<T2>, Merge<UnpackEnv<T1>, UnpackEnv<T2>>>
+): DomainFunction<UnpackData<T2>, Merge2<UnpackEnv<T1>, UnpackEnv<T2>>>
 function pipe<
   T1 extends DomainFunction,
   T2 extends DomainFunction,
@@ -223,7 +219,7 @@ function pipe<
   d3: T3,
 ): DomainFunction<
   UnpackData<T3>,
-  Merge<Merge<UnpackEnv<T1>, UnpackEnv<T2>>, UnpackEnv<T3>>
+  Merge3<UnpackEnv<T1>, UnpackEnv<T2>, UnpackEnv<T3>>
 >
 function pipe<
   T1 extends DomainFunction,
@@ -237,10 +233,7 @@ function pipe<
   d4: T4,
 ): DomainFunction<
   UnpackData<T4>,
-  Merge<
-    Merge<Merge<UnpackEnv<T1>, UnpackEnv<T2>>, UnpackEnv<T3>>,
-    UnpackEnv<T4>
-  >
+  Merge4<UnpackEnv<T1>, UnpackEnv<T2>, UnpackEnv<T3>, UnpackEnv<T4>>
 >
 function pipe<
   T1 extends DomainFunction,
@@ -256,11 +249,11 @@ function pipe<
   d5: T5,
 ): DomainFunction<
   UnpackData<T5>,
-  Merge<
-    Merge<
-      Merge<Merge<UnpackEnv<T1>, UnpackEnv<T2>>, UnpackEnv<T3>>,
-      UnpackEnv<T4>
-    >,
+  Merge5<
+    UnpackEnv<T1>,
+    UnpackEnv<T2>,
+    UnpackEnv<T3>,
+    UnpackEnv<T4>,
     UnpackEnv<T5>
   >
 >
