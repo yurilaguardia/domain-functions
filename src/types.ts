@@ -25,10 +25,7 @@ type ErrorData = Omit<ErrorResult, 'success'>
 type Result<T = void> = SuccessResult<T> | ErrorResult
 
 type GenericRecord = Record<string | symbol | number, unknown>
-type DomainFunction<
-  Output = unknown,
-  Environment extends GenericRecord = GenericRecord,
-> = {
+type DomainFunction<Output = unknown, Environment = GenericRecord> = {
   (input: unknown, environment?: Environment): Promise<Result<Output>>
 }
 

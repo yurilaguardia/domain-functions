@@ -1,4 +1,6 @@
 import * as z from 'zod'
+import { UnpackData } from './types'
+import { Merge } from 'type-fest'
 import {
   EnvironmentError,
   InputError,
@@ -15,100 +17,168 @@ import {
   SuccessResult,
 } from './types'
 
+const emptyObject = z.object({})
+type EmptyObject = z.infer<typeof emptyObject>
 type MakeDomainFunction = <
-  Schema extends z.ZodTypeAny,
+  InpSchema extends z.ZodTypeAny,
   EnvSchema extends z.AnyZodObject,
 >(
-  inputSchema: Schema,
+  inputSchema: InpSchema,
   environmentSchema?: EnvSchema,
 ) => <Output>(
   handler: (
-    inputSchema: z.infer<Schema>,
+    inputSchema: z.infer<InpSchema>,
     environmentSchema?: z.infer<EnvSchema>,
   ) => Promise<Output>,
-) => DomainFunction<
-  Output,
-  EnvSchema extends undefined ? z.AnyZodObject : z.infer<EnvSchema>
->
-
-const formatSchemaErrors = (errors: z.ZodIssue[]): SchemaError[] =>
-  errors.map((error) => {
-    const { path, message } = error
-    return { path: path.map(String), message }
-  })
+) => DomainFunction<Output, z.infer<EnvSchema>>
 
 const makeDomainFunction: MakeDomainFunction =
   (
     inputSchema: z.ZodTypeAny = z.object({}),
     environmentSchema: z.AnyZodObject = z.object({}),
   ) =>
-  (handler) => {
-    const domainFunction = (async (input, environment = {}) => {
-      const envResult = await environmentSchema.safeParseAsync(environment)
-      const result = await inputSchema.safeParseAsync(input)
+  (
+    handler,
+  ): DomainFunction<
+    Awaited<ReturnType<typeof handler>>,
+    z.infer<typeof environmentSchema>
+  > =>
+  async (input, environment = {}) => {
+    const envResult = await environmentSchema.safeParseAsync(environment)
+    const result = await inputSchema.safeParseAsync(input)
 
-      try {
-        if (result.success === true && envResult.success === true) {
-          return {
-            success: true,
-            data: await handler(result.data, envResult.data),
-            errors: [],
-            inputErrors: [],
-            environmentErrors: [],
-          }
-        }
-      } catch (error) {
-        if (error instanceof InputError) {
-          return {
-            success: false,
-            errors: [],
-            environmentErrors: [],
-            inputErrors: [schemaError(error.message, error.path)],
-          }
-        }
-        if (error instanceof EnvironmentError) {
-          return {
-            success: false,
-            errors: [],
-            environmentErrors: [schemaError(error.message, error.path)],
-            inputErrors: [],
-          }
-        }
-        if (error instanceof InputErrors) {
-          return {
-            success: false,
-            errors: [],
-            environmentErrors: [],
-            inputErrors: error.errors.map((e) =>
-              schemaError(e.message, e.path),
-            ),
-          }
-        }
+    try {
+      if (result.success === true && envResult.success === true) {
         return {
-          success: false,
-          errors: [toErrorWithMessage(error)],
+          success: true,
+          data: await handler(result.data, envResult.data),
+          errors: [],
           inputErrors: [],
           environmentErrors: [],
         }
       }
+    } catch (error) {
+      if (error instanceof InputError) {
+        return {
+          success: false,
+          errors: [],
+          environmentErrors: [],
+          inputErrors: [schemaError(error.message, error.path)],
+        }
+      }
+      if (error instanceof EnvironmentError) {
+        return {
+          success: false,
+          errors: [],
+          environmentErrors: [schemaError(error.message, error.path)],
+          inputErrors: [],
+        }
+      }
+      if (error instanceof InputErrors) {
+        return {
+          success: false,
+          errors: [],
+          environmentErrors: [],
+          inputErrors: error.errors.map((e) => schemaError(e.message, e.path)),
+        }
+      }
       return {
         success: false,
-        errors: [],
-        inputErrors: result.success
-          ? []
-          : formatSchemaErrors(result.error.issues),
-        environmentErrors: envResult.success
-          ? []
-          : formatSchemaErrors(envResult.error.issues),
+        errors: [toErrorWithMessage(error)],
+        inputErrors: [],
+        environmentErrors: [],
       }
-    }) as DomainFunction<Awaited<ReturnType<typeof handler>>>
-    return domainFunction
+    }
+    return {
+      success: false,
+      errors: [],
+      inputErrors: result.success
+        ? []
+        : formatSchemaErrors(result.error.issues),
+      environmentErrors: envResult.success
+        ? []
+        : formatSchemaErrors(envResult.error.issues),
+    }
   }
 
-type Unpack<T> = T extends DomainFunction<infer F> ? F : T
-function all<T extends readonly unknown[] | []>(
-  ...fns: T
-): DomainFunction<{ -readonly [P in keyof T]: Unpack<T[P]> }> {
+function formatSchemaErrors(errors: z.ZodIssue[]): SchemaError[] {
+  return errors.map((error) => {
+    const { path, message } = error
+    return { path: path.map(String), message }
+  })
+}
+
+type UnpackEnv<T> = T extends DomainFunction<infer I, infer E>
+  ? E extends Record<any, any>
+    ? E
+    : EmptyObject
+  : never
+
+function all<T1 extends DomainFunction, T2 extends DomainFunction>(
+  d1: T1,
+  d2: T2,
+): DomainFunction<
+  [UnpackData<T1>, UnpackData<T2>],
+  Merge<UnpackEnv<T1>, UnpackEnv<T2>>
+>
+function all<
+  T1 extends DomainFunction,
+  T2 extends DomainFunction,
+  T3 extends DomainFunction,
+>(
+  d1: T1,
+  d2: T2,
+  d3: T3,
+): DomainFunction<
+  [UnpackData<T1>, UnpackData<T2>, UnpackData<T3>],
+  Merge<Merge<UnpackEnv<T1>, UnpackEnv<T2>>, UnpackEnv<T3>>
+>
+function all<
+  T1 extends DomainFunction,
+  T2 extends DomainFunction,
+  T3 extends DomainFunction,
+  T4 extends DomainFunction,
+>(
+  d1: T1,
+  d2: T2,
+  d3: T3,
+  d4: T4,
+): DomainFunction<
+  [UnpackData<T1>, UnpackData<T2>, UnpackData<T3>, UnpackData<T4>],
+  Merge<
+    Merge<Merge<UnpackEnv<T1>, UnpackEnv<T2>>, UnpackEnv<T3>>,
+    UnpackEnv<T4>
+  >
+>
+function all<
+  T1 extends DomainFunction,
+  T2 extends DomainFunction,
+  T3 extends DomainFunction,
+  T4 extends DomainFunction,
+  T5 extends DomainFunction,
+>(
+  d1: T1,
+  d2: T2,
+  d3: T3,
+  d4: T4,
+  d5: T5,
+): DomainFunction<
+  [
+    UnpackData<T1>,
+    UnpackData<T2>,
+    UnpackData<T3>,
+    UnpackData<T4>,
+    UnpackData<T5>,
+  ],
+  Merge<
+    Merge<
+      Merge<Merge<UnpackEnv<T1>, UnpackEnv<T2>>, UnpackEnv<T3>>,
+      UnpackEnv<T4>
+    >,
+    UnpackEnv<T5>
+  >
+>
+function all(...fns: DomainFunction[]): DomainFunction {
   return async (input, environment) => {
     const results = await Promise.all(
       fns.map((fn) => (fn as DomainFunction)(input, environment)),
@@ -131,7 +201,7 @@ function all<T extends readonly unknown[] | []>(
       inputErrors: [],
       environmentErrors: [],
       errors: [],
-    } as unknown as SuccessResult<{ -readonly [P in keyof T]: Unpack<T[P]> }>
+    }
   }
 }
 
@@ -139,15 +209,65 @@ function isListOfSuccess<T>(result: Result<T>[]): result is SuccessResult<T>[] {
   return result.every(({ success }) => success === true)
 }
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-type Last<T extends readonly unknown[]> = T extends [...infer I, infer L]
-  ? L
-  : never
-type Flow = <T extends readonly DomainFunction[]>(...fns: T) => Last<T>
-const pipe: Flow = (...fns) => {
+function pipe<T1 extends DomainFunction, T2 extends DomainFunction>(
+  d1: T1,
+  d2: T2,
+): DomainFunction<UnpackData<T2>, Merge<UnpackEnv<T1>, UnpackEnv<T2>>>
+function pipe<
+  T1 extends DomainFunction,
+  T2 extends DomainFunction,
+  T3 extends DomainFunction,
+>(
+  d1: T1,
+  d2: T2,
+  d3: T3,
+): DomainFunction<
+  UnpackData<T3>,
+  Merge<Merge<UnpackEnv<T1>, UnpackEnv<T2>>, UnpackEnv<T3>>
+>
+function pipe<
+  T1 extends DomainFunction,
+  T2 extends DomainFunction,
+  T3 extends DomainFunction,
+  T4 extends DomainFunction,
+>(
+  d1: T1,
+  d2: T2,
+  d3: T3,
+  d4: T4,
+): DomainFunction<
+  UnpackData<T4>,
+  Merge<
+    Merge<Merge<UnpackEnv<T1>, UnpackEnv<T2>>, UnpackEnv<T3>>,
+    UnpackEnv<T4>
+  >
+>
+function pipe<
+  T1 extends DomainFunction,
+  T2 extends DomainFunction,
+  T3 extends DomainFunction,
+  T4 extends DomainFunction,
+  T5 extends DomainFunction,
+>(
+  d1: T1,
+  d2: T2,
+  d3: T3,
+  d4: T4,
+  d5: T5,
+): DomainFunction<
+  UnpackData<T5>,
+  Merge<
+    Merge<
+      Merge<Merge<UnpackEnv<T1>, UnpackEnv<T2>>, UnpackEnv<T3>>,
+      UnpackEnv<T4>
+    >,
+    UnpackEnv<T5>
+  >
+>
+function pipe(...fns: DomainFunction[]): DomainFunction {
   const [head, ...tail] = fns
 
-  return ((input: unknown, environment?: GenericRecord) => {
+  return (input: unknown, environment?: GenericRecord) => {
     return tail.reduce(async (memo, fn) => {
       const resolved = await memo
       if (resolved.success) {
@@ -156,7 +276,7 @@ const pipe: Flow = (...fns) => {
         return memo
       }
     }, head(input, environment))
-  }) as Last<typeof fns>
+  }
 }
 
 type Map = <O, R, E extends GenericRecord>(
